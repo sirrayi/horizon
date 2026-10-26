@@ -23,10 +23,12 @@ def check_motion(host, guest, out):
                             f'{{Tags:["{tag}"],Motion:[0.1d,0.0d,0.0d]}}')
     samples = []
     try:
-        for _ in range(8):
-            balls = [p for p in guest('status')['projectiles'] if p['kind'] == 'LargeFireball']
+        # One ctl process for all samples: a ctl process per sample took 10-16 ticks on a loaded runner, by
+        # which time the fireball (~2 blocks a tick) had left the cleared corridor and exploded.
+        replies = guest.script(['status', 'wait 2'] * 8, every=True)
+        for status in (reply for reply in replies if 'projectiles' in reply):
+            balls = [p for p in status['projectiles'] if p['kind'] == 'LargeFireball']
             samples.append(balls[0]['position'][0] if balls else None)
-            guest.wait(2)
     finally:
         host('command', command=f'kill @e[tag={tag}]')
     seen = [p for p in samples if p is not None]
