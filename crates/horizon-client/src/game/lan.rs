@@ -30,6 +30,12 @@ use std::{
 /// The registries and tags are the same for every world: load them once.
 static SYNC: OnceLock<std::result::Result<Arc<SyncData>, String>> = OnceLock::new();
 
+/// The registries and tags a server sends, loaded from `root` the first time.
+pub(super) fn sync_data(root: &std::path::Path) -> std::result::Result<Arc<SyncData>, String> {
+    SYNC.get_or_init(|| SyncData::load(root).map(Arc::new))
+        .clone()
+}
+
 /// The settings of the open world (WorldOptionsScreen's multiplayer section).
 #[derive(Clone, Copy, Debug)]
 pub struct LanSettings {
@@ -562,10 +568,7 @@ impl Game<'_> {
         config: HubConfig,
         host: Option<u128>,
     ) -> Result<()> {
-        let root = self.options.resources.clone();
-        let sync = SYNC
-            .get_or_init(|| SyncData::load(&root).map(Arc::new))
-            .clone()?;
+        let sync = sync_data(&self.options.resources)?;
         let biome_names: Vec<String> = self
             .res
             .biomes()

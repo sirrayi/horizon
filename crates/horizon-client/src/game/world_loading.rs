@@ -196,6 +196,35 @@ impl WorldLoader {
     }
 }
 
+/// Read on a helper thread, once, while the title screen is up: what every
+/// world opening loads and keeps for the rest of the process (the worldgen
+/// bundle, the loot tables and the registries the server sends). A world
+/// opened meanwhile waits for the part being read instead of reading it again.
+pub(super) fn prefetch_world_data(
+    resources: &std::path::Path,
+    registry: &'static horizon_world::registry::BlockRegistry,
+) {
+    static STARTED: std::sync::Once = std::sync::Once::new();
+    let mut first = false;
+    STARTED.call_once(|| first = true);
+    if !first {
+        return;
+    }
+    let resources = resources.to_owned();
+    let spawned = std::thread::Builder::new()
+        .name("World data prefetch".into())
+        .spawn(move || {
+            horizon_threads::behind_server();
+            // Errors are left for the world opening to report.
+            let _ = horizon_client::vanillagen::shared_data(&resources.join("worldgen"), registry);
+            let _ = horizon_client::structure_blocks::loot_data(&resources);
+            let _ = super::lan::sync_data(&resources);
+        });
+    if let Err(e) = spawned {
+        log::warn!("Horizon: world data prefetch: {e}");
+    }
+}
+
 pub(super) fn make_streaming(
     res: &Resources,
     pack: &PackResources,

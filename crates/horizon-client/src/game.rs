@@ -13020,6 +13020,9 @@ impl Game<'_> {
         if self.rest_loader.is_some() {
             return Ok(());
         }
+        if self.title.is_some() {
+            world_loading::prefetch_world_data(&self.options.resources, self.pack.assets.registry);
+        }
         if std::mem::take(&mut self.pending_pack_reload) {
             self.reload_packs();
         }
